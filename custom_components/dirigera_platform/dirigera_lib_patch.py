@@ -10,6 +10,7 @@ from dirigera.devices.outlet import Outlet, dict_to_outlet
 from dirigera.devices.environment_sensor import EnvironmentSensor, dict_to_environment_sensor
 from dirigera.hub.abstract_smart_home_hub import AbstractSmartHomeHub
 from dirigera.devices.scene import Info, Icon, Trigger, TriggerDetails, ControllerType
+from dirigera.devices.light import Light, LightAttributes
 import logging
 
 logger = logging.getLogger("custom_components.dirigera_platform")
@@ -296,6 +297,25 @@ class HubX(Hub):
             raise ValueError("Device is not a MotionSensor or OccupancySensor")
         return dict_to_motion_sensor_x(motion_sensor, self)
 
+    def get_lights(self) -> List[LightX]:
+        """
+        Fetches all lights registered in the Hub.
+        Same as the library's Hub.get_lights, but builds LightX so the hub's
+        colorMode survives parsing (issue #50).
+        """
+        devices = self.get("/devices")
+        lights = list(filter(lambda x: x["type"] == "light", devices))
+        return [dict_to_light_x(light, self) for light in lights]
+
+    def get_light_by_id(self, id_: str) -> LightX:
+        """
+        Fetches a light by ID, as LightX (issue #50).
+        """
+        light = self._get_device_data_by_id(id_)
+        if light["type"] != "light":
+            raise ValueError("Device is not a light")
+        return dict_to_light_x(light, self)
+
 
 class ControllerAttributesX(Attributes):
     is_on: Optional[bool] = None
@@ -383,3 +403,26 @@ def dict_to_motion_sensor_x(
     data: Dict[str, Any], dirigera_client: AbstractSmartHomeHub
 ) -> MotionSensorX:
     return MotionSensorX(dirigeraClient=dirigera_client, **data)
+
+
+# Light patch for issue #50
+# The hub reports "colorMode": "color" | "temperature" on every light, but the
+# library's LightAttributes drops it (pydantic extra=ignore). Carrying it lets
+# the entity report the bulb's real colour mode after a restart instead of
+# defaulting to hs (see light.py set_state and hub_event_listener colorMode).
+class LightAttributesX(LightAttributes):
+    color_mode: Optional[str] = None
+
+
+class LightX(Light):
+    attributes: LightAttributesX
+
+    def reload(self) -> "LightX":
+        data = self.dirigera_client.get(route=f"/devices/{self.id}")
+        return LightX(dirigeraClient=self.dirigera_client, **data)
+
+
+def dict_to_light_x(
+    data: Dict[str, Any], dirigera_client: AbstractSmartHomeHub
+) -> LightX:
+    return LightX(dirigeraClient=dirigera_client, **data)

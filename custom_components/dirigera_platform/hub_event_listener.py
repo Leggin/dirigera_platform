@@ -53,7 +53,7 @@ process_events_from = {
                                 "energyConsumedAtLastReset",
                                 "timeOfLastEnergyReset",
                                 "totalEnergyConsumedLastUpdated"],
-    "light"           :     ["isOn", "lightLevel", "colorTemperature", "colorHue", "colorSaturation", "customName"],
+    "light"           :     ["isOn", "lightLevel", "colorTemperature", "colorHue", "colorSaturation", "colorMode", "customName"],
     "openCloseSensor" :     ["isOpen","batteryPercentage","customName"],
     "waterSensor"     :     ["waterLeakDetected","batteryPercentage","customName"],
     "blinds"          :     ["blindsCurrentLevel","batteryPercentage","customName"],
@@ -841,6 +841,12 @@ class hub_event_listener(threading.Thread):
                         continue
                     try:
                         key_attr = to_snake_case(key)
+                        if key == "colorMode":
+                            # Drives _color_mode below; only stored on the model
+                            # when it carries the field (LightAttributesX).
+                            if hasattr(entity._json_data.attributes, "color_mode"):
+                                entity._json_data.attributes.color_mode = attributes[key]
+                            continue
                         # This is a hack need a better impl
                         if key_attr == "is_on":
                             turn_on_off = True
@@ -883,6 +889,14 @@ class hub_event_listener(threading.Thread):
                         entity._color_mode = ColorMode.HS
                     elif "colorTemperature" in attributes and ColorMode.COLOR_TEMP in supported:
                         entity._color_mode = ColorMode.COLOR_TEMP
+                    # The hub's explicit colorMode wins over the key heuristic
+                    # above: the echo of a CT patch can still carry stale
+                    # colorHue/colorSaturation values.
+                    hub_mode = attributes.get("colorMode")
+                    if hub_mode == "temperature" and ColorMode.COLOR_TEMP in supported:
+                        entity._color_mode = ColorMode.COLOR_TEMP
+                    elif hub_mode == "color" and ColorMode.HS in supported:
+                        entity._color_mode = ColorMode.HS
 
                 # Lights behave odd with hubs when setting attribute one event is generated which
                 # causes brightness or other to toggle so put in a hack to fix that

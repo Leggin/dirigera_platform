@@ -170,7 +170,18 @@ class ikea_bulb(LightEntity):
             self._supported_color_modes = [ColorMode.ONOFF]
         else:
             self._supported_color_modes = color_modes
-            if ColorMode.HS in self._supported_color_modes:
+            # Prefer the hub's own colorMode ("temperature" | "color") when the
+            # model carries it (LightAttributesX in dirigera_lib_patch, issue
+            # #50). Without it, a dual-mode bulb in colour-temperature mode
+            # reports hs after a restart, and HA reports color_temp_kelvin as
+            # None until the next colour event. The HS-first rule below stays
+            # as the fallback for a plain Light (runtime device discovery).
+            hub_mode = getattr(self._json_data.attributes, "color_mode", None)
+            if hub_mode == "temperature" and ColorMode.COLOR_TEMP in self._supported_color_modes:
+                self._color_mode = ColorMode.COLOR_TEMP
+            elif hub_mode == "color" and ColorMode.HS in self._supported_color_modes:
+                self._color_mode = ColorMode.HS
+            elif ColorMode.HS in self._supported_color_modes:
                 self._color_mode = ColorMode.HS
             elif ColorMode.COLOR_TEMP in self._supported_color_modes:
                 self._color_mode = ColorMode.COLOR_TEMP
