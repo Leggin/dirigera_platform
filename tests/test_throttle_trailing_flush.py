@@ -67,16 +67,19 @@ class _StubFinder:
 
     ROOTS = ("homeassistant", "dirigera", "voluptuous", "websocket", "requests", "urllib3")
 
-    def find_module(self, fullname, path=None):
-        return self if fullname.split(".")[0] in self.ROOTS else None
+    # find_spec/create_module/exec_module: Python 3.12 dropped the old
+    # find_module/load_module fallback, so a finder with only those is skipped
+    # and the real (missing) homeassistant import fails.
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split(".")[0] not in self.ROOTS:
+            return None
+        return importlib.util.spec_from_loader(fullname, self, is_package=True)
 
-    def load_module(self, fullname):
-        if fullname in sys.modules:
-            return sys.modules[fullname]
-        mod = _PermissiveModule(fullname)
-        mod.__loader__ = self
-        sys.modules[fullname] = mod
-        return mod
+    def create_module(self, spec):
+        return _PermissiveModule(spec.name)
+
+    def exec_module(self, module):
+        pass
 
 
 def _load_base_classes():
