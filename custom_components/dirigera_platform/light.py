@@ -491,6 +491,11 @@ class ikea_bulb_device_set(LightEntity):
         logger.debug(kwargs)
 
         try:
+            # The set's state is its first bulb's, so the hub's echo for that
+            # bulb is the only way it reaches HA. Unlike ikea_bulb, nothing is
+            # written through here, so the echo must not be ignored: doing so
+            # left the set and its first bulb on their old brightness, white
+            # and colour while the hub had applied the new ones.
             self._controller.reset_ignore_update()
             await self.hass.async_add_executor_job(self.patch_command,{"isOn": True})
 
@@ -507,7 +512,6 @@ class ikea_bulb_device_set(LightEntity):
                 logger.debug("Set brightness : {}".format(level))
                 logger.debug("Set scaled brightness : {}".format(scaled))
                 await self.hass.async_add_executor_job(self.patch_command, {"lightLevel" : scaled})
-                self._controller._ignore_update = True
 
             if ATTR_COLOR_TEMP_KELVIN in kwargs and ColorMode.COLOR_TEMP in self._controller.supported_color_modes:
                 # color temp requested
@@ -516,14 +520,12 @@ class ikea_bulb_device_set(LightEntity):
                 ct = kwargs[ATTR_COLOR_TEMP_KELVIN]
                 logger.debug("Set CT : {}".format(ct))
                 await self.hass.async_add_executor_job(self.patch_command, {"colorTemperature" : ct})
-                self._controller._ignore_update = True
 
             if ATTR_HS_COLOR in kwargs and ColorMode.HS in self._controller.supported_color_modes:
                 logger.debug("Request to set color HS device_set")
                 hs_tuple = kwargs[ATTR_HS_COLOR]
                 hue = hs_tuple[0]
                 saturation = hs_tuple[1] / 100  # Saturation is 0 - 1 at IKEA
-                self._controller._ignore_update = True
 
                 await self.hass.async_add_executor_job(self.patch_command,{ "colorHue" : hue, "colorSaturation" : saturation})
 
