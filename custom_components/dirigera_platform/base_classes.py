@@ -426,7 +426,11 @@ class ikea_motion_sensor(ikea_base_device_sensor, BinarySensorEntity):
         logger.debug("ikea_motion_sensor ctor...")
         # No suffix or name prefix for backward compatibility
         super().__init__(device)
-   
+
+    @property
+    def device_class(self) -> str:
+        return BinarySensorDeviceClass.MOTION
+
     @property
     def is_on(self):
         return self._device.is_on or self._device.is_detected
