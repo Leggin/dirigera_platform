@@ -299,6 +299,11 @@ class OptionsFlowHandler(config_entries.OptionsFlowWithConfigEntry):
             CONF_ENABLED_PLATFORMS: getattr(
                 self, "enabled_platforms", DEFAULT_ENABLED_PLATFORMS
             ),
+            # Issue #61: #49 added this to the pairing path only, so saving an
+            # option without re-pairing dropped it.
+            CONF_EXCLUDE_MATTER: getattr(
+                self, "exclude_matter", DEFAULT_EXCLUDE_MATTER
+            ),
         }
         title = "IKEA Dirigera Hub : {}".format(self.ip)
         self.hass.config_entries.async_update_entry(
